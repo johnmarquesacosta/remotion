@@ -77,14 +77,17 @@ assetsRouter.post("/:videoId/fetch-images", async (req, res) => {
     const imagesDir = path.join(videoDir, "assets", "images");
     fs.mkdirSync(imagesDir, { recursive: true });
 
-    // Encontra cenas com imageQuery
+    // Encontra cenas com imageQuery (suporta content, props ou raiz)
     const scenesWithQuery = (script.scenes ?? [])
-      .map((s: Scene, index: number) => ({
-        index,
-        id: s.id ?? `scene-${String(index + 1).padStart(2, "0")}`,
-        query: (s.content?.imageQuery as string | undefined) || (s as Record<string, unknown>).imageQuery as string | undefined,
-        imageFile: (s.content?.imageFile as string | undefined) || (s as Record<string, unknown>).imageFile as string | undefined,
-      }))
+      .map((s: Scene, index: number) => {
+        const props = (s as unknown as Record<string, Record<string, unknown>>).props ?? {};
+        const root = s as unknown as Record<string, unknown>;
+        const sceneId = s.id ?? `scene-${String(index + 1).padStart(2, "0")}`;
+        const query = (s.content?.imageQuery as string | undefined) || (props.imageQuery as string | undefined) || (root.imageQuery as string | undefined);
+        // Usa o mesmo padrão de nome de arquivo que o DynamicVideo (id.jpg)
+        const imageFile = (s.content?.imageFile as string | undefined) || (props.imageFile as string | undefined) || (root.imageFile as string | undefined) || (query ? `${sceneId}.jpg` : undefined);
+        return { index, id: sceneId, query, imageFile };
+      })
       .filter((s) => s.query);
 
     if (scenesWithQuery.length === 0) {
@@ -139,9 +142,11 @@ assetsRouter.post("/:videoId/fetch-images", async (req, res) => {
           const buffer = await imgRes.arrayBuffer();
           fs.writeFileSync(imgPath, Buffer.from(buffer));
 
-          const sceneInScript = script.scenes[scene.index];
+          const sceneInScript = script.scenes[scene.index] as unknown as Record<string, Record<string, unknown>>;
           if (sceneInScript.content) {
             sceneInScript.content.imageFile = filename;
+          } else if (sceneInScript.props) {
+            sceneInScript.props.imageFile = filename;
           } else {
             (sceneInScript as unknown as Record<string, unknown>).imageFile = filename;
           }

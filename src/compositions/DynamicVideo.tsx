@@ -39,16 +39,32 @@ export const DynamicVideo: React.FC<DynamicVideoProps> = ({ videoId, script }) =
     // Monta o content a partir dos campos extras (a IA pode gerar fora de "content")
     const content: Record<string, unknown> = { ...(scene.content ?? {}) };
 
+    // A IA às vezes coloca dados em scene.props em vez de scene.content ou raiz
+    const propsFromIA = (scene.props as Record<string, unknown> | undefined) ?? {};
+    for (const [key, value] of Object.entries(propsFromIA)) {
+      if (content[key] === undefined) {
+        content[key] = value;
+      }
+    }
+
     // Campos que a IA costuma colocar no nível raiz ao invés de dentro de content
     const extraContentKeys = [
       "title", "subtitle", "items", "cards", "highlight",
       "imageQuery", "imageFile", "caption", "layout", "timeline",
-      "visual",
+      "visual", "text", "highlightWords",
     ];
     for (const key of extraContentKeys) {
       if (scene[key] !== undefined && content[key] === undefined) {
         content[key] = scene[key];
       }
+    }
+
+    // Se existe imageQuery mas não imageFile, gera o nome do arquivo automaticamente
+    if (content.imageQuery && !content.imageFile) {
+      content.imageFile = `${id}.jpg`;
+    } else if (typeof content.imageFile === "string" && !/\.(jpg|jpeg|png|webp)$/i.test(content.imageFile)) {
+      // Corrige se o imageFile foi salvo sem extensão
+      content.imageFile = `${content.imageFile}.jpg`;
     }
 
     return {

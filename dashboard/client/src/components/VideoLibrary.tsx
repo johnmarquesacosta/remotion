@@ -19,6 +19,7 @@ export const VideoLibrary: React.FC<Props> = ({ onSelectVideo }) => {
   const [renderingId, setRenderingId] = useState<string | null>(null);
   const [renderPercent, setRenderPercent] = useState(0);
   const [retryingTtsId, setRetryingTtsId] = useState<string | null>(null);
+  const [ttsProvider, setTtsProvider] = useState<"kokoro" | "omnivoice">("omnivoice");
   const { setScript, setVideoId, setStatus } = useStore();
 
   const loadVideos = async () => {
@@ -27,6 +28,7 @@ export const VideoLibrary: React.FC<Props> = ({ onSelectVideo }) => {
       const list = await listVideos();
       setVideos(list);
     } catch {
+      console.error("Erro ao carregar vídeos");
     } finally {
       setLoading(false);
     }
@@ -70,7 +72,7 @@ export const VideoLibrary: React.FC<Props> = ({ onSelectVideo }) => {
   const handleRetryTTS = (videoId: string) => {
     setRetryingTtsId(videoId);
 
-    retryTTS(videoId, "kokoro", (event, data) => {
+    retryTTS(videoId, ttsProvider, (event, data) => {
       if (event === "warning") {
         console.warn(`[RetryTTS] ${data.message}`);
       }
@@ -195,14 +197,26 @@ export const VideoLibrary: React.FC<Props> = ({ onSelectVideo }) => {
                 </button>
               )}
 
-              <button
-                className="action-btn retry-tts-btn"
-                onClick={() => handleRetryTTS(v.videoId)}
-                disabled={retryingTtsId !== null || renderingId !== null}
-                title="Re-gerar áudios TTS ausentes (3 tentativas com backoff)"
-              >
-                {retryingTtsId === v.videoId ? "⏳ TTS..." : "🔁 Re-TTS"}
-              </button>
+              <div className="card-tts-row">
+                <select
+                  className="tts-select"
+                  value={ttsProvider}
+                  onChange={(e) => setTtsProvider(e.target.value as "kokoro" | "omnivoice")}
+                  disabled={retryingTtsId !== null || renderingId !== null}
+                  title="Provedor TTS para re-geração"
+                >
+                  <option value="omnivoice">Omnivoice</option>
+                  <option value="kokoro">Kokoro</option>
+                </select>
+                <button
+                  className="action-btn retry-tts-btn"
+                  onClick={() => handleRetryTTS(v.videoId)}
+                  disabled={retryingTtsId !== null || renderingId !== null}
+                  title="Re-gerar áudios TTS ausentes"
+                >
+                  {retryingTtsId === v.videoId ? "⏳ TTS..." : "🔁 Re-TTS"}
+                </button>
+              </div>
             </div>
           </div>
         ))}

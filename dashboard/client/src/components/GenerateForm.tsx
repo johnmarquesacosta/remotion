@@ -11,7 +11,7 @@ export const GenerateForm: React.FC = () => {
     narrativeText: "",
     channelId: "channel-default",
     format: "16:9",
-    ttsProvider: "kokoro",
+    ttsProvider: "omnivoice",
   });
 
   const handleSubmit = () => {

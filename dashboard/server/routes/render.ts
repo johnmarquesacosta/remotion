@@ -30,34 +30,37 @@ renderRouter.post("/", (req, res) => {
 
   send("progress", { label: `Renderizando ${videoId}...` });
 
-  // O compositionId é "DynamicVideo" (única composição registrada no Root.tsx)
   const tempPropsPath = path.join(outputDir, "temp-props.json");
   fs.writeFileSync(tempPropsPath, JSON.stringify({ videoId }));
 
-  // Usa caminho relativo para evitar problemas de escape no Windows
+  // Caminho relativo para evitar problemas de escape no Windows
   const relativePropsPath = path.join("videos", videoId, "temp-props.json");
 
   const stderrLines: string[] = [];
 
-  // No Windows, npx precisa ser chamado via shell ou npx.cmd
+  // No Windows, usar shell: true resolve o spawn EINVAL com npx.cmd
   const isWindows = process.platform === "win32";
   const cmd = isWindows ? "npx.cmd" : "npx";
 
-  const child = spawn(cmd, [
-    "remotion", "render", "DynamicVideo", outputFile, "--props", relativePropsPath
-  ], { cwd: projectRoot });
+  const child = spawn(
+    cmd,
+    ["remotion", "render", "DynamicVideo", outputFile, "--props", relativePropsPath],
+    {
+      cwd: projectRoot,
+      // shell: true é necessário no Windows para executar scripts .cmd
+      shell: isWindows,
+    }
+  );
 
   console.log(`[render] Iniciando: videoId=${videoId}, output=${outputFile}`);
 
   child.stdout?.on("data", (data: Buffer) => {
-    // Extrai percentual do output do Remotion
     const text = data.toString();
     const match = text.match(/(\d+)%/);
     if (match) send("progress", { label: `Renderizando...`, percent: parseInt(match[1]) });
   });
 
   child.stderr?.on("data", (data: Buffer) => {
-    // Remotion output progress info em stderr
     const text = data.toString();
     const match = text.match(/(\d+)%/);
     if (match) send("progress", { label: `Renderizando...`, percent: parseInt(match[1]) });
@@ -66,10 +69,16 @@ renderRouter.post("/", (req, res) => {
     process.stderr.write(`[render] ${text}`);
   });
 
+  child.on("error", (err) => {
+    console.error(`[render] Erro ao iniciar processo: ${err.message}`);
+    send("error", { message: `Falha ao iniciar o Remotion: ${err.message}` });
+    res.end();
+  });
+
   child.on("close", (code) => {
     // Remove o arquivo temporário de props
     if (fs.existsSync(tempPropsPath)) {
-      try { fs.unlinkSync(tempPropsPath); } catch {}
+      try { fs.unlinkSync(tempPropsPath); } catch { /* ignore */ }
     }
     console.log(`[render] Processo encerrado com código ${code}`);
     if (code === 0) {

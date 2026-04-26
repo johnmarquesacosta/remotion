@@ -393,6 +393,33 @@ main.library-layout {
   color: #ffcc44;
 }
 
+.card-tts-row {
+  display: flex;
+  flex: 1;
+  min-width: 120px;
+  gap: 0.25rem;
+}
+
+.card-tts-row .retry-tts-btn {
+  flex: 1;
+}
+
+.tts-select {
+  background: rgba(255, 168, 0, 0.06);
+  border: 1px solid rgba(255, 168, 0, 0.25);
+  border-radius: 6px;
+  color: #ffa800;
+  font-size: 0.75rem;
+  padding: 0.3em 0.4em;
+  cursor: pointer;
+  max-width: 90px;
+}
+
+.tts-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .card-render-progress {
   flex: 1;
   display: flex;

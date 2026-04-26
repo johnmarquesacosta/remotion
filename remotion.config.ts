@@ -4,5 +4,15 @@ Config.setVideoImageFormat("jpeg");
 Config.setOverwriteOutput(true);
 Config.setPublicDir("./public");
 
-// Para suporte a múltiplos formatos, use props na composição
-// 16:9: 1920x1080 | 9:16: 1080x1920
+// 🚀 Aceleração Gráfica do Chromium (Headless)
+// Opções: "angle" | "egl" | "vulkan" | "swiftshader" | "gl" | null
+// "angle" é o mais compatível no Windows com GPU NVIDIA
+Config.setChromiumOpenGlRenderer("angle");
+
+// 🎬 Codec de saída (h264 é o mais compatível; h265 gera arquivos menores)
+// Nota: NVENC (hardware encoding) não é configurável via setCodec nesta versão do Remotion.
+// Para usar NVENC, passe a flag manualmente: --codec h264 no CLI.
+Config.setCodec("h264");
+
+// Opcional: Ajuste de concorrência baseado nos núcleos da sua CPU
+// Config.setConcurrency(8);
