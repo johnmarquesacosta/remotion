@@ -50,7 +50,7 @@ const calculateMetadata: CalculateMetadataFunction<DynamicVideoProps> = async ({
 
   const fps = script.fps ?? 30;
   const totalDuration = script.scenes.reduce(
-    (sum: number, s: any) => sum + (s.durationInSeconds ?? 5),
+    (sum, s) => sum + (s.durationInSeconds ?? 5),
     0
   );
   const totalFrames = Math.round(totalDuration * fps);

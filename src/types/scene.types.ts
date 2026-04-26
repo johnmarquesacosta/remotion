@@ -16,8 +16,11 @@ export const SceneTypeSchema = z.union([
 export interface CarouselIcon {
   id: string;
   label: string;
-  iconName: string;
-  iconLibrary: "fi" | "md" | "fa" | "bs" | "hi" | "io5" | "ri" | "si";
+  // react-icons path (optional — use emoji as fallback)
+  iconName?: string;
+  iconLibrary?: "fi" | "md" | "fa" | "bs" | "hi" | "io5" | "ri" | "si";
+  // Emoji fallback when iconName/iconLibrary are not available
+  emoji?: string;
 }
 
 export const ZoomOriginSchema = z.union([
@@ -71,3 +74,18 @@ export type VideoScript = z.infer<typeof VideoScriptSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
 export type SceneType = z.infer<typeof SceneTypeSchema>;
 export type ZoomOrigin = z.infer<typeof ZoomOriginSchema>;
+
+/** Cena já normalizada pelo DynamicVideo (campos extras movidos para content) */
+export interface NormalizedScene {
+  id: string;
+  type: string;
+  durationInSeconds: number;
+  narration?: {
+    file?: string;
+    text?: string;
+    startAtSecond?: number;
+  };
+  camera?: Record<string, unknown>;
+  vfx?: Record<string, unknown>;
+  content: Record<string, unknown>;
+}

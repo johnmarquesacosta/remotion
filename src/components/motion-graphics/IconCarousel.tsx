@@ -3,28 +3,45 @@ import { AbsoluteFill, spring, useCurrentFrame, useVideoConfig } from "remotion"
 import type { ChannelTheme } from "../../types/channel.types";
 import type { CarouselIcon } from "../../types/scene.types";
 
+// Importações oficiais (ESM) para evitar require()
+import * as Fi from "react-icons/fi";
+import * as Md from "react-icons/md";
+import * as Fa from "react-icons/fa";
+import * as Bs from "react-icons/bs";
+import * as Hi from "react-icons/hi";
+import * as Io5 from "react-icons/io5";
+import * as Ri from "react-icons/ri";
+import * as Si from "react-icons/si";
 
+// Mapeamento das bibliotecas de ícones
+const ICON_LIBS: Record<string, Record<string, React.ComponentType<{ size: number; color: string }>>> = {
+  fi: Fi as unknown as Record<string, React.ComponentType<{ size: number; color: string }>>,
+  md: Md as unknown as Record<string, React.ComponentType<{ size: number; color: string }>>,
+  fa: Fa as unknown as Record<string, React.ComponentType<{ size: number; color: string }>>,
+  bs: Bs as unknown as Record<string, React.ComponentType<{ size: number; color: string }>>,
+  hi: Hi as unknown as Record<string, React.ComponentType<{ size: number; color: string }>>,
+  io5: Io5 as unknown as Record<string, React.ComponentType<{ size: number; color: string }>>,
+  ri: Ri as unknown as Record<string, React.ComponentType<{ size: number; color: string }>>,
+  si: Si as unknown as Record<string, React.ComponentType<{ size: number; color: string }>>,
+};
 
 // Importa dinamicamente o ícone correto da biblioteca correta
-const DynamicIcon: React.FC<{ iconName: string; iconLibrary: string; size: number; color: string }> = ({
-  iconName,
-  iconLibrary,
-  size,
-  color,
-}) => {
+const DynamicIcon: React.FC<{
+  icon: CarouselIcon;
+  size: number;
+  color: string;
+}> = ({ icon, size, color }) => {
   const IconComponent = React.useMemo(() => {
-    const libs: Record<string, Record<string, React.FC<{ size: number; color: string }>>> = {
-      fi: require("react-icons/fi"),
-      md: require("react-icons/md"),
-      fa: require("react-icons/fa"),
-      bs: require("react-icons/bs"),
-      hi: require("react-icons/hi"),
-      io5: require("react-icons/io5"),
-      ri: require("react-icons/ri"),
-      si: require("react-icons/si"),
-    };
-    return libs[iconLibrary]?.[iconName];
-  }, [iconName, iconLibrary]);
+    // Se houver emoji, não precisamos de componente de ícone
+    if (icon.emoji || !icon.iconName || !icon.iconLibrary) return undefined;
+    
+    return ICON_LIBS[icon.iconLibrary]?.[icon.iconName];
+  }, [icon.iconName, icon.iconLibrary, icon.emoji]);
+
+  // Retornos de renderização SEMPRE após todos os hooks
+  if (icon.emoji) {
+    return <span style={{ fontSize: size * 0.4, color }}>{icon.emoji}</span>;
+  }
 
   if (!IconComponent) {
     return <span style={{ fontSize: size * 0.4, color }}>?</span>;
@@ -100,8 +117,7 @@ export const IconCarousel: React.FC<IconCarouselProps> = ({
               opacity,
             }}>
               <DynamicIcon
-                iconName={icon.iconName}
-                iconLibrary={icon.iconLibrary}
+                icon={icon}
                 size={iconSize}
                 color={isActive ? theme.colors.accent : theme.colors.textMuted}
               />

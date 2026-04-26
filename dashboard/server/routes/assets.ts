@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import fetch from "node-fetch";
+import type { VideoScript, Scene } from "../../../src/types/scene.types";
 
 export const assetsRouter = express.Router();
 
@@ -37,8 +38,9 @@ assetsRouter.delete("/:videoId/images/:filename", (req, res) => {
   try {
     fs.unlinkSync(filePath);
     res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    res.status(500).json({ error: message });
   }
 });
 
@@ -62,7 +64,7 @@ assetsRouter.post("/:videoId/fetch-images", async (req, res) => {
   };
 
   try {
-    const script = JSON.parse(fs.readFileSync(scriptPath, "utf-8"));
+    const script = JSON.parse(fs.readFileSync(scriptPath, "utf-8")) as VideoScript;
     const UNSPLASH_KEY = process.env.UNSPLASH_ACCESS_KEY;
 
     if (!UNSPLASH_KEY) {
@@ -75,15 +77,15 @@ assetsRouter.post("/:videoId/fetch-images", async (req, res) => {
     const imagesDir = path.join(videoDir, "assets", "images");
     fs.mkdirSync(imagesDir, { recursive: true });
 
-    // Encontra cenas com imageQuery (pode estar no nível raiz ou dentro de content)
+    // Encontra cenas com imageQuery
     const scenesWithQuery = (script.scenes ?? [])
-      .map((s: any, index: number) => ({
+      .map((s: Scene, index: number) => ({
         index,
         id: s.id ?? `scene-${String(index + 1).padStart(2, "0")}`,
-        query: s.imageQuery || s.content?.imageQuery || s.props?.imageQuery,
-        imageFile: s.imageFile || s.content?.imageFile || s.props?.imageFile,
+        query: (s.content?.imageQuery as string | undefined) || (s as Record<string, unknown>).imageQuery as string | undefined,
+        imageFile: (s.content?.imageFile as string | undefined) || (s as Record<string, unknown>).imageFile as string | undefined,
       }))
-      .filter((s: any) => s.query);
+      .filter((s) => s.query);
 
     if (scenesWithQuery.length === 0) {
       send("done", { message: "Nenhuma cena com imageQuery encontrada", fetched: 0 });
@@ -100,7 +102,6 @@ assetsRouter.post("/:videoId/fetch-images", async (req, res) => {
       const filename = scene.imageFile ?? `${scene.id}.jpg`;
       const imgPath = path.join(imagesDir, filename);
 
-      // Pula se a imagem já existe
       if (fs.existsSync(imgPath)) {
         send("progress", {
           label: `⏭️ ${filename} já existe`,
@@ -120,13 +121,17 @@ assetsRouter.post("/:videoId/fetch-images", async (req, res) => {
       try {
         const orientation = format === "16:9" ? "landscape" : "portrait";
         const searchUrl = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
-          scene.query
+          scene.query as string
         )}&per_page=1&orientation=${orientation}`;
 
         const searchRes = await fetch(searchUrl, {
           headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` },
         });
-        const searchData = (await searchRes.json()) as any;
+        
+        interface UnsplashResponse {
+          results: Array<{ urls: { regular: string } }>;
+        }
+        const searchData = (await searchRes.json()) as UnsplashResponse;
 
         if (searchData.results?.length) {
           const imgUrl = searchData.results[0].urls.regular;
@@ -134,14 +139,11 @@ assetsRouter.post("/:videoId/fetch-images", async (req, res) => {
           const buffer = await imgRes.arrayBuffer();
           fs.writeFileSync(imgPath, Buffer.from(buffer));
 
-          // Atualiza o imageFile no script (suporta content, props ou raiz)
           const sceneInScript = script.scenes[scene.index];
           if (sceneInScript.content) {
             sceneInScript.content.imageFile = filename;
-          } else if (sceneInScript.props) {
-            sceneInScript.props.imageFile = filename;
           } else {
-            sceneInScript.imageFile = filename;
+            (sceneInScript as unknown as Record<string, unknown>).imageFile = filename;
           }
 
           fetched++;
@@ -153,17 +155,17 @@ assetsRouter.post("/:videoId/fetch-images", async (req, res) => {
         } else {
           send("warning", { message: `Nenhum resultado para "${scene.query}"` });
         }
-      } catch (e: any) {
-        send("warning", { message: `Erro ao buscar "${scene.query}": ${e.message}` });
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        send("warning", { message: `Erro ao buscar "${scene.query}": ${message}` });
       }
     }
 
-    // Salva script com imageFile atualizado
     fs.writeFileSync(scriptPath, JSON.stringify(script, null, 2));
-
     send("done", { message: `${fetched} imagens baixadas`, fetched });
-  } catch (err: any) {
-    send("error", { message: err.message ?? "Erro ao buscar imagens" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Erro ao buscar imagens";
+    send("error", { message });
   } finally {
     res.end();
   }

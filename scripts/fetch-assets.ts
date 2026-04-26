@@ -25,7 +25,16 @@ async function fetchImage(query: string, filename: string) {
 
   const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`;
   const res = await fetch(url, { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } });
-  const data = await res.json() as any;
+  
+  interface UnsplashSearchResponse {
+    results: Array<{
+      urls: {
+        full: string;
+      };
+    }>;
+  }
+  
+  const data = (await res.json()) as UnsplashSearchResponse;
 
   if (!data.results?.length) {
     console.warn(`⚠️  Nenhuma imagem encontrada para: ${query}`);

@@ -5,6 +5,7 @@ import fetch from "node-fetch";
 import { generateScriptWithClaude } from "../services/claude";
 import { generateAudioWithRetry, type TTSProvider } from "../services/tts";
 import { getAudioDuration } from "../services/audio-duration";
+import type { VideoScript } from "../../../src/types/scene.types";
 
 export const generateRouter = express.Router();
 
@@ -50,7 +51,7 @@ generateRouter.post("/", async (req, res) => {
       format,
       title,
       narrativeText,
-    }) as any;
+    });
 
     // Salva versão inicial (sem durações reais de áudio ainda)
     const scriptPath = path.join(videoDir, "script.json");
@@ -62,12 +63,12 @@ generateRouter.post("/", async (req, res) => {
     send("progress", { step: 2, total: 4, label: "Gerando narração (TTS)..." });
 
     const scenesWithNarration = script.scenes.filter(
-      (s: any) => s.narration?.text && s.narration?.file
+      (s) => s.narration?.text && s.narration?.file
     );
 
     for (let i = 0; i < scenesWithNarration.length; i++) {
       const scene = scenesWithNarration[i];
-      const audioPath = path.join(narrationDir, scene.narration.file);
+      const audioPath = path.join(narrationDir, scene.narration!.file!);
 
       send("progress", {
         step: 2,
@@ -77,7 +78,7 @@ generateRouter.post("/", async (req, res) => {
       });
 
       await generateAudioWithRetry(
-        scene.narration.text,
+        scene.narration!.text!,
         audioPath,
         ttsProvider,
         3,
@@ -90,7 +91,7 @@ generateRouter.post("/", async (req, res) => {
 
       // Mede duração real e atualiza no script
       const duration = await getAudioDuration(audioPath);
-      const sceneIndex = script.scenes.findIndex((s: any) => s.id === scene.id);
+      const sceneIndex = script.scenes.findIndex((s) => s.id === scene.id);
       if (sceneIndex !== -1) {
         // Adiciona 0.5s de padding ao final
         script.scenes[sceneIndex].durationInSeconds = Math.ceil(duration + 0.5);
@@ -106,13 +107,13 @@ generateRouter.post("/", async (req, res) => {
     send("progress", { step: 3, total: 4, label: "Buscando imagens..." });
 
     const UNSPLASH_KEY = process.env.UNSPLASH_ACCESS_KEY;
-    const scenesWithImages = script.scenes.filter((s: any) => (s.content?.imageQuery || s.props?.imageQuery));
+    const scenesWithImages = script.scenes.filter((s) => s.content?.imageQuery);
 
     if (UNSPLASH_KEY && scenesWithImages.length > 0) {
       for (let i = 0; i < scenesWithImages.length; i++) {
         const scene = scenesWithImages[i];
-        const query = scene.content?.imageQuery || scene.props?.imageQuery;
-        const filename = scene.content?.imageFile || scene.props?.imageFile || `${scene.id}.jpg`;
+        const query = scene.content.imageQuery as string;
+        const filename = (scene.content.imageFile as string | undefined) || `${scene.id}.jpg`;
 
         send("progress", {
           step: 3,
@@ -125,7 +126,11 @@ generateRouter.post("/", async (req, res) => {
           const searchRes = await fetch(searchUrl, {
             headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` },
           });
-          const searchData = await searchRes.json() as any;
+          
+          interface UnsplashResponse {
+            results: Array<{ urls: { regular: string } }>;
+          }
+          const searchData = (await searchRes.json()) as UnsplashResponse;
 
           if (searchData.results?.length) {
             const imgUrl = searchData.results[0].urls.regular;
@@ -134,17 +139,13 @@ generateRouter.post("/", async (req, res) => {
             const imgPath = path.join(videoDir, "assets", "images", filename);
             fs.writeFileSync(imgPath, Buffer.from(buffer));
 
-            // Atualiza o imageFile no script (em content ou props)
-            const sceneIndex = script.scenes.findIndex((s: any) => s.id === scene.id);
+            // Atualiza o imageFile no script
+            const sceneIndex = script.scenes.findIndex((s) => s.id === scene.id);
             if (sceneIndex !== -1) {
-              if (script.scenes[sceneIndex].content) {
-                script.scenes[sceneIndex].content.imageFile = filename;
-              } else if (script.scenes[sceneIndex].props) {
-                script.scenes[sceneIndex].props.imageFile = filename;
-              }
+              script.scenes[sceneIndex].content.imageFile = filename;
             }
           }
-        } catch (e) {
+        } catch {
           send("warning", { message: `Não foi possível buscar imagem para "${query}"` });
         }
       }
@@ -160,8 +161,9 @@ generateRouter.post("/", async (req, res) => {
     send("progress", { step: 4, total: 4, label: "Pipeline completo!", done: true });
     send("done", { videoId, scriptPath: `videos/${videoId}/script.json`, script });
 
-  } catch (err: any) {
-    send("error", { message: err.message ?? "Erro desconhecido no pipeline" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido no pipeline";
+    send("error", { message });
   } finally {
     res.end();
   }
@@ -190,15 +192,15 @@ generateRouter.post("/retry-tts/:videoId", async (req, res) => {
       throw new Error(`script.json não encontrado para o vídeo "${videoId}"`);
     }
 
-    const script = JSON.parse(fs.readFileSync(scriptPath, "utf-8")) as any;
+    const script = JSON.parse(fs.readFileSync(scriptPath, "utf-8")) as VideoScript;
 
-    const scenesWithNarration = (script.scenes as any[]).filter(
+    const scenesWithNarration = script.scenes.filter(
       (s) => s.narration?.text && s.narration?.file
     );
 
     // Filtra somente as cenas cujo arquivo de áudio está ausente
     const missingScenes = scenesWithNarration.filter((s) => {
-      const audioPath = path.join(narrationDir, s.narration.file);
+      const audioPath = path.join(narrationDir, s.narration!.file!);
       return !fs.existsSync(audioPath);
     });
 
@@ -219,7 +221,7 @@ generateRouter.post("/retry-tts/:videoId", async (req, res) => {
 
     for (let i = 0; i < missingScenes.length; i++) {
       const scene = missingScenes[i];
-      const audioPath = path.join(narrationDir, scene.narration.file);
+      const audioPath = path.join(narrationDir, scene.narration!.file!);
 
       send("progress", {
         step: 1,
@@ -230,7 +232,7 @@ generateRouter.post("/retry-tts/:videoId", async (req, res) => {
 
       try {
         await generateAudioWithRetry(
-          scene.narration.text,
+          scene.narration!.text!,
           audioPath,
           ttsProvider,
           3,
@@ -242,16 +244,16 @@ generateRouter.post("/retry-tts/:videoId", async (req, res) => {
         );
 
         // Atualiza duração real no script
-        const { getAudioDuration } = await import("../services/audio-duration");
         const duration = await getAudioDuration(audioPath);
-        const sceneIndex = script.scenes.findIndex((s: any) => s.id === scene.id);
+        const sceneIndex = script.scenes.findIndex((s) => s.id === scene.id);
         if (sceneIndex !== -1) {
           script.scenes[sceneIndex].durationInSeconds = Math.ceil(duration + 0.5);
         }
 
         regenerated++;
-      } catch (err: any) {
-        const msg = `Cena "${scene.id}" falhou após 3 tentativas: ${err.message}`;
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        const msg = `Cena "${scene.id}" falhou após 3 tentativas: ${errorMsg}`;
         errors.push(msg);
         send("warning", { message: msg });
       }
@@ -276,8 +278,9 @@ generateRouter.post("/retry-tts/:videoId", async (req, res) => {
         message: `${regenerated} áudio(s) re-gerado(s) com sucesso!`,
       });
     }
-  } catch (err: any) {
-    send("error", { message: err.message ?? "Erro desconhecido no retry TTS" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido no retry TTS";
+    send("error", { message });
   } finally {
     res.end();
   }

@@ -1,12 +1,13 @@
 import fs from "fs";
 import path from "path";
-import fetch from "node-fetch";
+import fetch, { FormData } from "node-fetch";
 
 export type TTSProvider = "kokoro" | "omnivoice";
 
 interface TTSConfig {
   url: string;
-  buildBody: (text: string) => string;
+  buildBody: (text: string) => string | FormData;
+  headers?: Record<string, string>;
   audioFormat: "wav" | "mp3";
 }
 
@@ -28,16 +29,26 @@ const CONFIGS: Record<TTSProvider, TTSConfig> = {
         optional_pluralization_normalization: true
       }
     }),
+    headers: { "Content-Type": "application/json" },
     audioFormat: "mp3",
   },
   omnivoice: {
-    url: "http://localhost:7860/api/tts",
-    buildBody: (text) => JSON.stringify({
-      text,
-      speaker_id: parseInt(process.env.OMNIVOICE_SPEAKER ?? "0"),
-      language: process.env.OMNIVOICE_LANG ?? "pt",
-    }),
-    audioFormat: "wav",
+    url: "http://localhost:8000/api/tts",
+    buildBody: (text) => {
+      const fd = new FormData();
+      fd.append("guidance_scale", process.env.OMNIVOICE_GUIDANCE ?? "2");
+      fd.append("num_step", process.env.OMNIVOICE_STEPS ?? "64");
+      fd.append("speed", process.env.TTS_SPEED ?? "1");
+      fd.append("ref_audio", "");
+      fd.append("sentence_pause_ms", "0");
+      fd.append("text", text);
+      fd.append("voice", process.env.OMNIVOICE_VOICE ?? "john-es.mp3");
+      fd.append("language", process.env.OMNIVOICE_LANG ?? "Auto");
+      fd.append("ref_text", "");
+      return fd;
+    },
+    // Headers are automatically set by node-fetch when body is FormData
+    audioFormat: "mp3",
   },
 };
 
@@ -50,8 +61,8 @@ export async function generateAudio(
 
   const response = await fetch(config.url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: config.buildBody(text),
+    headers: config.headers,
+    body: config.buildBody(text) as unknown as string,
   });
 
   if (!response.ok) {
@@ -84,7 +95,7 @@ export async function generateAudioWithRetry(
     try {
       await generateAudio(text, outputPath, provider);
       return; // sucesso — sai imediatamente
-    } catch (err: any) {
+    } catch (err: unknown) {
       lastError = err instanceof Error ? err : new Error(String(err));
 
       if (attempt < maxAttempts) {

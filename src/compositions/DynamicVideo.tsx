@@ -2,6 +2,7 @@ import React from "react";
 import { Sequence, Html5Audio } from "remotion";
 import { BaseComposition } from "./BaseComposition";
 import { SceneRenderer } from "./SceneRenderer";
+import type { NormalizedScene } from "../types/scene.types";
 
 export type DynamicVideoProps = {
   videoId: string;
@@ -32,7 +33,7 @@ export const DynamicVideo: React.FC<DynamicVideoProps> = ({ videoId, script }) =
   const fps = script.fps ?? 30;
 
   // Normaliza cenas: garante que cada cena tenha um `id` e `content`
-  const normalizedScenes = script.scenes.map((scene, index) => {
+  const normalizedScenes: NormalizedScene[] = script.scenes.map((scene, index) => {
     const id = scene.id ?? `scene-${String(index + 1).padStart(2, "0")}`;
 
     // Monta o content a partir dos campos extras (a IA pode gerar fora de "content")
@@ -71,7 +72,6 @@ export const DynamicVideo: React.FC<DynamicVideoProps> = ({ videoId, script }) =
         channelId: script.channelId,
         format: script.format,
         fps,
-        scenes: normalizedScenes as any,
       }}
     >
       {normalizedScenes.map((scene, index) => {
@@ -94,11 +94,12 @@ export const DynamicVideo: React.FC<DynamicVideoProps> = ({ videoId, script }) =
               />
             )}
 
-            {/* Renderiza cena pelo tipo */}
+            {/* Renderiza cena pelo tipo, passando o sceneIndex para alternância de transição */}
             <SceneRenderer
-              scene={scene as any}
+              scene={scene}
               channelId={script.channelId}
               videoId={videoId}
+              sceneIndex={index}
             />
           </Sequence>
         );

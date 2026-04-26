@@ -1,4 +1,5 @@
 import fetch from "node-fetch";
+import type { VideoScript } from "../../../src/types/scene.types";
 
 export interface GenerateScriptInput {
   videoId: string;
@@ -41,7 +42,7 @@ REGRAS IMPORTANTES:
 
 RESPONDA APENAS COM O JSON VÁLIDO, sem markdown, sem comentários, sem texto adicional.`;
 
-export async function generateScriptWithClaude(input: GenerateScriptInput): Promise<object> {
+export async function generateScriptWithClaude(input: GenerateScriptInput): Promise<VideoScript> {
   const userMessage = `
 Título do vídeo: "${input.title}"
 Canal: ${input.channelId}
@@ -82,7 +83,15 @@ O campo "format" deve ser "${input.format}".
     throw new Error(`OpenRouter API error: ${response.status} ${errText}`);
   }
 
-  const data = await response.json() as any;
+  interface OpenRouterResponse {
+    choices: Array<{
+      message: {
+        content: string;
+      };
+    }>;
+  }
+
+  const data = (await response.json()) as OpenRouterResponse;
   const rawText = data.choices[0]?.message?.content || "";
 
   // Remove possíveis marcadores de código se o modelo os incluir mesmo com a instrução
@@ -92,5 +101,5 @@ O campo "format" deve ser "${input.format}".
     .replace(/\s*```$/i, "")
     .trim();
 
-  return JSON.parse(clean);
+  return JSON.parse(clean) as VideoScript;
 }

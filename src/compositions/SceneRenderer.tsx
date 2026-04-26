@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, Img, useVideoConfig } from "remotion";
+import { AbsoluteFill, Img, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { getTheme } from "../themes";
 
 // Components
@@ -11,41 +11,58 @@ import { Timeline } from "../components/motion-graphics/Timeline";
 import { Checklist } from "../components/motion-graphics/Checklist";
 import { StudioMonitorLayout } from "../components/layout/StudioMonitorLayout";
 import { HandheldShake } from "../components/camera/HandheldShake";
-import { ZoomFromCenter } from "../components/camera/ZoomFromCenter";
 import { SceneFade } from "../components/transitions/SceneFade";
+import { SceneSlideUp } from "../components/transitions/SceneSlideUp";
+import type { NormalizedScene, CarouselIcon } from "../types/scene.types";
 
 interface SceneRendererProps {
-  scene: any;
+  scene: NormalizedScene;
   channelId: string;
   videoId: string;
+  sceneIndex: number;
 }
 
-export const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, channelId, videoId }) => {
+export const SceneRenderer: React.FC<SceneRendererProps> = ({
+  scene,
+  channelId,
+  videoId,
+  sceneIndex,
+}) => {
   const theme = getTheme(channelId);
   const { fps } = useVideoConfig();
-  
+  const frame = useCurrentFrame();
+
   // Helper to get image URL from the dashboard server
   const getImageUrl = (imageFile?: string) => {
     if (!imageFile) return undefined;
     return `http://localhost:3333/videos/${videoId}/assets/${imageFile}`;
   };
 
-  const imageSrc = getImageUrl(scene.imageFile);
+  // Bug fix #1: read imageFile from scene.content (not scene root)
+  const imageSrc = getImageUrl(scene.content?.imageFile as string | undefined);
   const durationFrames = Math.round((scene.durationInSeconds || 5) * fps);
 
-  // Common background image wrapper
+  // Bug fix #2: zoom applied ONLY to background image, not to text/overlays
+  const imageScale = interpolate(frame, [0, durationFrames], [1, 1.06], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  // Common background image with subtle Ken-Burns zoom
   const BackgroundImage = () => {
     if (!imageSrc) return null;
     return (
-      <Img 
-        src={imageSrc} 
-        style={{ 
-          position: "absolute", 
-          width: "100%", 
-          height: "100%", 
-          objectFit: "cover", 
-          opacity: 0.4 
-        }} 
+      <Img
+        src={imageSrc}
+        style={{
+          position: "absolute",
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          opacity: 0.4,
+          transform: `scale(${imageScale})`,
+          transformOrigin: "center center",
+        }}
       />
     );
   };
@@ -56,18 +73,18 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, channelId, 
       return (
         <AbsoluteFill style={{ backgroundColor: theme.colors.background, alignItems: "center", justifyContent: "center" }}>
           <BackgroundImage />
-          <AnimatedTitle 
-            text={scene.title || scene.content?.title || "Título do Vídeo"} 
-            theme={theme} 
+          <AnimatedTitle
+            text={(scene.content?.title as string | undefined) || "Título do Vídeo"}
+            theme={theme}
           />
         </AbsoluteFill>
       );
-      
+
     case "documentary-layout": {
-      const infoBox = (scene.layout?.infoBoxes || scene.content?.infoBoxes || [])[0];
+      const infoBox = (scene.content?.infoBoxes as Array<{ title?: string; text?: string }> | undefined)?.[0];
       return (
         <AbsoluteFill style={{ backgroundColor: theme.colors.background }}>
-          <DocumentaryLayout 
+          <DocumentaryLayout
             theme={theme}
             imageSrc={imageSrc}
             title={infoBox?.title}
@@ -76,12 +93,12 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, channelId, 
         </AbsoluteFill>
       );
     }
-      
+
     case "text-highlight":
       return (
         <AbsoluteFill style={{ backgroundColor: theme.colors.background, alignItems: "center", justifyContent: "center" }}>
           <BackgroundImage />
-          <ProgressiveHighlight 
+          <ProgressiveHighlight
             text={scene.narration?.text || "Texto em destaque"}
             startFrame={10}
             endFrame={durationFrames - 10}
@@ -91,19 +108,24 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, channelId, 
       );
 
     case "icon-carousel": {
-      const cards = scene.cards || scene.content?.cards || [];
-      const icons = cards.map((c: any, i: number) => ({
+      const cards = scene.content?.cards as Array<{ title: string; icon?: string }> | undefined ?? [];
+      // Bug fix #3: build icons with emoji fallback instead of missing iconName/iconLibrary
+      const emojiMap: Record<string, string> = {
+        dna: "🧬",
+        "arrow-west": "⬅️",
+        "timeline-dot": "⏳",
+      };
+      const icons: CarouselIcon[] = cards.map((c, i) => ({
         id: `icon-${i}`,
         label: c.title,
-        emoji: c.icon === "dna" ? "🧬" : c.icon === "arrow-west" ? "⬅️" : c.icon === "timeline-dot" ? "⏳" : "📌"
+        emoji: c.icon ? (emojiMap[c.icon] ?? "📌") : "📌",
       }));
-      // Ativa o índice com base no tempo da cena
       const framesPerItem = Math.floor(durationFrames / Math.max(1, icons.length));
 
       return (
         <AbsoluteFill style={{ backgroundColor: theme.colors.background }}>
           <BackgroundImage />
-          <IconCarousel 
+          <IconCarousel
             icons={icons}
             framesPerItem={framesPerItem}
             theme={theme}
@@ -111,28 +133,28 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, channelId, 
         </AbsoluteFill>
       );
     }
-      
+
     case "timeline": {
-      const markers = scene.timeline?.markers || scene.content?.markers || [];
-      const events = markers.map((m: any, i: number) => ({
-        label: m.value || m.label,
+      const markers = (scene.content?.markers as Array<{ value?: string; label?: string }> | undefined) ?? [];
+      const events = markers.map((m, i) => ({
+        label: m.value ?? m.label ?? "",
         revealFrame: 10 + (i * 30),
       }));
 
       return (
         <AbsoluteFill style={{ backgroundColor: theme.colors.background }}>
           <BackgroundImage />
-          <Timeline 
+          <Timeline
             events={events}
             theme={theme}
           />
         </AbsoluteFill>
       );
     }
-      
+
     case "checklist": {
-      const itemsRaw = scene.items || scene.content?.items || [];
-      const items = itemsRaw.map((label: string, i: number) => ({
+      const itemsRaw = (scene.content?.items as string[] | undefined) ?? [];
+      const items = itemsRaw.map((label, i) => ({
         label,
         revealAtFrame: 10 + (i * 20),
       }));
@@ -141,7 +163,7 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, channelId, 
         <AbsoluteFill style={{ backgroundColor: theme.colors.background, padding: 100, justifyContent: "center" }}>
           <BackgroundImage />
           <div style={{ position: "relative", zIndex: 1 }}>
-            <Checklist 
+            <Checklist
               items={items}
               theme={theme}
             />
@@ -149,37 +171,51 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, channelId, 
         </AbsoluteFill>
       );
     }
-      
-    case "image-fullscreen":
+
+    case "image-fullscreen": {
+      // Bug fix #1 (also): caption lives in scene.content, not scene root
+      const caption = scene.content?.caption as string | undefined;
       return (
         <AbsoluteFill style={{ backgroundColor: "#000" }}>
-          {imageSrc && <Img src={imageSrc} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-          {scene.caption && (
-             <AbsoluteFill style={{ justifyContent: "flex-end", padding: "80px", alignItems: "center" }}>
-               <h2 style={{ 
-                 color: "white", 
-                 fontSize: "60px", 
-                 fontFamily: theme.typography.styleA.family,
-                 textShadow: "0px 4px 20px rgba(0,0,0,0.9)",
-                 textAlign: "center",
-                 backgroundColor: "rgba(0,0,0,0.4)",
-                 padding: "20px 40px",
-                 borderRadius: 20
-               }}>
-                 {scene.caption}
-               </h2>
-             </AbsoluteFill>
+          {imageSrc && (
+            <Img
+              src={imageSrc}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                transform: `scale(${imageScale})`,
+                transformOrigin: "center center",
+              }}
+            />
+          )}
+          {caption && (
+            <AbsoluteFill style={{ justifyContent: "flex-end", padding: "80px", alignItems: "center" }}>
+              <h2 style={{
+                color: "white",
+                fontSize: "60px",
+                fontFamily: theme.typography.styleA.family,
+                textShadow: "0px 4px 20px rgba(0,0,0,0.9)",
+                textAlign: "center",
+                backgroundColor: "rgba(0,0,0,0.4)",
+                padding: "20px 40px",
+                borderRadius: 20,
+              }}>
+                {caption}
+              </h2>
+            </AbsoluteFill>
           )}
         </AbsoluteFill>
       );
+    }
 
     case "studio-monitor": {
-      const { imageSrc, ...rest } = scene.content || {};
+      const { imageSrc: studioImage, ...rest } = scene.content ?? {};
       return (
         <AbsoluteFill style={{ backgroundColor: theme.colors.background }}>
           <StudioMonitorLayout
-            src={getImageUrl(imageSrc as string) || ""}
-            {...rest}
+            src={getImageUrl(studioImage as string) ?? ""}
+            {...(rest as Record<string, unknown>)}
           />
         </AbsoluteFill>
       );
@@ -197,13 +233,19 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({ scene, channelId, 
     }
   };
 
+  // Bug fix #4: alternate transitions — title/first scene → SceneFade, odd scenes → SceneSlideUp
+  const Transition = sceneIndex === 0 || scene.type === "title"
+    ? SceneFade
+    : sceneIndex % 2 === 0
+      ? SceneFade
+      : SceneSlideUp;
+
   return (
     <HandheldShake intensity={theme.vfx?.handheldIntensity ?? 0.02}>
-      <ZoomFromCenter from={1} to={1.04} endFrame={durationFrames}>
-        <SceneFade totalFrames={durationFrames}>
-          {renderScene()}
-        </SceneFade>
-      </ZoomFromCenter>
+      {/* ZoomFromCenter removed from here — zoom is now only on BackgroundImage */}
+      <Transition totalFrames={durationFrames}>
+        {renderScene()}
+      </Transition>
     </HandheldShake>
   );
 };

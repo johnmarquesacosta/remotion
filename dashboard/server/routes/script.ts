@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import type { VideoScript, Scene } from "../../../src/types/scene.types";
 
 export const scriptRouter = express.Router();
 
@@ -25,8 +26,9 @@ scriptRouter.put("/:videoId", (req, res) => {
   try {
     fs.writeFileSync(filePath, JSON.stringify(req.body, null, 2));
     res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
   }
 });
 
@@ -57,28 +59,24 @@ scriptRouter.get("/", (_req, res) => {
 
       if (hasScript) {
         try {
-          const s = JSON.parse(fs.readFileSync(scriptPath, "utf-8"));
-          const titleScene = s.scenes?.find((sc: any) => sc.type === "title");
-          const title = titleScene?.content?.title ?? titleScene?.title ?? d.name;
+          const s = JSON.parse(fs.readFileSync(scriptPath, "utf-8")) as VideoScript;
+          const titleScene = s.scenes?.find((sc: Scene) => sc.type === "title");
+          const title = (titleScene?.content?.title as string | undefined) ?? (titleScene as unknown as Record<string, string>).title ?? d.name;
 
-          // Conta narrações
           const narrationDir = path.join(videoDir, "narration");
           const narrationFiles = fs.existsSync(narrationDir)
             ? fs.readdirSync(narrationDir).filter((f: string) => f.endsWith(".mp3") || f.endsWith(".wav"))
             : [];
 
-          // Conta imagens
           const imagesDir = path.join(videoDir, "assets", "images");
           const imageFiles = fs.existsSync(imagesDir)
             ? fs.readdirSync(imagesDir).filter((f: string) => /\.(jpg|jpeg|png|webp)$/i.test(f))
             : [];
 
-          // Verifica se existe render
           const hasRender = fs.existsSync(path.join(videoDir, `${d.name}.mp4`));
 
-          // Conta cenas com imageQuery
           const scenesWithImages = (s.scenes ?? []).filter(
-            (sc: any) => sc.imageQuery || sc.content?.imageQuery
+            (sc: Scene) => sc.content?.imageQuery || (sc as unknown as Record<string, unknown>).imageQuery
           );
 
           meta = {
@@ -95,12 +93,13 @@ scriptRouter.get("/", (_req, res) => {
             imageQueryCount: scenesWithImages.length,
             hasRender,
           };
-        } catch {}
+        } catch {
+          // Ignore parse errors
+        }
       }
 
       return meta;
     })
-    // Ordena por nome (mais recentes primeiro, pois o ID é timestamp)
     .sort((a, b) => String(b.videoId).localeCompare(String(a.videoId)));
 
   res.json(dirs);

@@ -5,10 +5,17 @@ import { AnimatedGrid } from "../components/vfx/AnimatedGrid";
 import { Vignette } from "../components/vfx/Vignette";
 import { VintageOverlay } from "../components/vfx/VintageOverlay";
 import { getTheme } from "../themes";
-import type { VideoScript } from "../types/scene.types";
+
+/** Minimal config needed by BaseComposition — does NOT require full VideoScript */
+interface BaseCompositionConfig {
+  videoId: string;
+  channelId: string;
+  format: "16:9" | "9:16";
+  fps?: number;
+}
 
 interface BaseCompositionProps {
-  script: VideoScript;
+  script: BaseCompositionConfig;
   children: React.ReactNode;
   debugGrid?: boolean;
 }

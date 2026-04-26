@@ -1,3 +1,5 @@
+import type { VideoScript } from "../../../src/types/scene.types";
+
 const BASE = "http://localhost:3333/api";
 
 export interface GenerateInput {
@@ -11,7 +13,7 @@ export interface GenerateInput {
 // ── SSE helper ─────────────────────────────────────────────────────────────
 function consumeSSE(
   res: Response,
-  onProgress: (event: string, data: any) => void,
+  onProgress: (event: string, data: Record<string, unknown>) => void,
   abortRef?: { aborted: boolean }
 ) {
   const reader = res.body!.getReader();
@@ -38,7 +40,9 @@ function consumeSSE(
         if (eventData) {
           try {
             onProgress(eventName, JSON.parse(eventData));
-          } catch {}
+          } catch {
+            // Silently ignore parse errors
+          }
         }
       }
     }
@@ -48,7 +52,7 @@ function consumeSSE(
 // ── Generate ───────────────────────────────────────────────────────────────
 export function startGeneration(
   input: GenerateInput,
-  onProgress: (event: string, data: any) => void
+  onProgress: (event: string, data: Record<string, unknown>) => void
 ): () => void {
   const abortRef = { aborted: false };
 
@@ -64,7 +68,7 @@ export function startGeneration(
 }
 
 // ── Script ─────────────────────────────────────────────────────────────────
-export async function saveScript(videoId: string, script: object) {
+export async function saveScript(videoId: string, script: VideoScript) {
   await fetch(`${BASE}/script/${videoId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -72,7 +76,7 @@ export async function saveScript(videoId: string, script: object) {
   });
 }
 
-export async function getScript(videoId: string) {
+export async function getScript(videoId: string): Promise<VideoScript> {
   const res = await fetch(`${BASE}/script/${videoId}`);
   return res.json();
 }
@@ -101,7 +105,7 @@ export interface VideoMeta {
 export function startRender(
   videoId: string,
   compositionId: string,
-  onProgress: (event: string, data: any) => void
+  onProgress: (event: string, data: Record<string, unknown>) => void
 ) {
   fetch(`${BASE}/render`, {
     method: "POST",
@@ -130,7 +134,7 @@ export async function deleteImage(videoId: string, filename: string) {
 
 export function fetchImages(
   videoId: string,
-  onProgress: (event: string, data: any) => void
+  onProgress: (event: string, data: Record<string, unknown>) => void
 ) {
   fetch(`${BASE}/assets/${videoId}/fetch-images`, {
     method: "POST",
@@ -141,7 +145,7 @@ export function fetchImages(
 export function retryTTS(
   videoId: string,
   ttsProvider: "kokoro" | "omnivoice",
-  onProgress: (event: string, data: any) => void
+  onProgress: (event: string, data: Record<string, unknown>) => void
 ): () => void {
   const abortRef = { aborted: false };
 
