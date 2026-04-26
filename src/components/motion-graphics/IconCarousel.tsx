@@ -25,28 +25,22 @@ const ICON_LIBS: Record<string, Record<string, React.ComponentType<{ size: numbe
   si: Si as unknown as Record<string, React.ComponentType<{ size: number; color: string }>>,
 };
 
-// Importa dinamicamente o ícone correto da biblioteca correta
 const DynamicIcon: React.FC<{
   icon: CarouselIcon;
   size: number;
   color: string;
 }> = ({ icon, size, color }) => {
   const IconComponent = React.useMemo(() => {
-    // Se houver emoji, não precisamos de componente de ícone
     if (icon.emoji || !icon.iconName || !icon.iconLibrary) return undefined;
-    
     return ICON_LIBS[icon.iconLibrary]?.[icon.iconName];
   }, [icon.iconName, icon.iconLibrary, icon.emoji]);
 
-  // Retornos de renderização SEMPRE após todos os hooks
   if (icon.emoji) {
-    return <span style={{ fontSize: size * 0.4, color }}>{icon.emoji}</span>;
+    return <span style={{ fontSize: size * 0.45, lineHeight: 1 }}>{icon.emoji}</span>;
   }
-
   if (!IconComponent) {
-    return <span style={{ fontSize: size * 0.4, color }}>?</span>;
+    return <span style={{ fontSize: size * 0.4, color }}>📌</span>;
   }
-
   return <IconComponent size={size * 0.5} color={color} />;
 };
 
@@ -55,82 +49,98 @@ export interface IconCarouselProps {
   theme: ChannelTheme;
   framesPerItem?: number;
   iconSize?: number;
-  gap?: number;
 }
 
 export const IconCarousel: React.FC<IconCarouselProps> = ({
   icons,
   theme,
   framesPerItem = 80,
-  iconSize = 200,
-  gap = 40,
+  iconSize = 180,
 }) => {
   const frame = useCurrentFrame();
-  const { width, fps } = useVideoConfig();
-  const itemWidth = iconSize + gap;
+  const { fps } = useVideoConfig();
 
-  // Índice ativo atual para estilização
+  // Índice ativo avança a cada framesPerItem frames
   const activeIndex = Math.min(Math.floor(frame / framesPerItem), icons.length - 1);
 
-  // Animação suave entre os itens
-  let animatedIndex = 0;
-  for (let i = 1; i < icons.length; i++) {
-    animatedIndex += spring({
-      fps,
-      frame: frame - i * framesPerItem,
-      config: { damping: 14, stiffness: 100 },
-    });
-  }
+  // Spring de entrada para o card ativo (escala)
+  const activeScale = spring({
+    fps,
+    frame: frame - activeIndex * framesPerItem,
+    config: { damping: 16, stiffness: 120, mass: 0.8 },
+    from: 0.85,
+    to: 1,
+  });
 
-  const offset = -animatedIndex * itemWidth + width / 2 - iconSize / 2;
+  // Quantos por linha — max 4
+  const cols = Math.min(icons.length, 4);
+  const gap = 32;
+  const cardSize = Math.min(iconSize, Math.floor(880 / cols) - gap);
 
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
-      <div style={{
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-        transform: `translateX(${offset}px)`,
-        gap,
-        position: "absolute",
-      }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${cols}, ${cardSize}px)`,
+          gap,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
         {icons.map((icon, i) => {
           const isActive = i === activeIndex;
-          const scale = isActive ? 1.1 : 0.9;
-          const opacity = isActive ? 1 : 0.5;
+          // Cards anteriores ao ativo aparecem com fade-in na sua revelação
+          const hasBeenRevealed = i <= activeIndex;
+          const revealProgress = spring({
+            fps,
+            frame: frame - i * framesPerItem,
+            config: { damping: 18, stiffness: 100 },
+          });
 
           return (
-            <div key={icon.id} style={{
-              width: iconSize,
-              height: iconSize,
-              borderRadius: iconSize * 0.2,
-              backgroundColor: isActive ? `${theme.colors.accent}22` : theme.colors.surface,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              transition: "background-color 0.3s, border 0.3s, transform 0.3s, opacity 0.3s",
-              border: isActive ? `4px solid ${theme.colors.accent}` : `2px solid ${theme.colors.surface}`,
-              flexShrink: 0,
-              transform: `scale(${scale})`,
-              opacity,
-            }}>
+            <div
+              key={icon.id}
+              style={{
+                width: cardSize,
+                height: cardSize,
+                borderRadius: cardSize * 0.18,
+                backgroundColor: isActive
+                  ? `${theme.colors.accent}22`
+                  : `${theme.colors.surface}cc`,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                border: isActive
+                  ? `4px solid ${theme.colors.accent}`
+                  : `2px solid ${theme.colors.surface}`,
+                flexShrink: 0,
+                opacity: hasBeenRevealed ? revealProgress : 0,
+                transform: `scale(${isActive ? activeScale : hasBeenRevealed ? 0.92 : 0.8})`,
+                boxShadow: isActive
+                  ? `0 8px 40px ${theme.colors.accent}44`
+                  : "none",
+              }}
+            >
               <DynamicIcon
                 icon={icon}
-                size={iconSize}
+                size={cardSize}
                 color={isActive ? theme.colors.accent : theme.colors.textMuted}
               />
               <span
                 style={{
                   fontFamily: theme.typography.styleB.family,
-                  fontSize: 24,
+                  fontSize: Math.max(18, cardSize * 0.13),
+                  fontWeight: isActive ? 700 : 400,
                   color: isActive ? theme.colors.text : theme.colors.textMuted,
                   textAlign: "center",
-                  maxWidth: iconSize - 16,
+                  maxWidth: cardSize - 20,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
+                  textShadow: isActive ? "0 2px 8px rgba(0,0,0,0.6)" : "none",
                 }}
               >
                 {icon.label}

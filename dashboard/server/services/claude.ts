@@ -10,51 +10,49 @@ export interface GenerateScriptInput {
 }
 
 const SCENE_TYPES_REFERENCE = `
-Tipos de cena disponíveis — TODOS devem ser usados ao longo do vídeo (distribua de forma variada):
+Kit de componentes visuais disponíveis (escolha livremente o mais adequado para cada trecho):
 
-- "title": SEMPRE a primeira cena. Exibe o título com animação letra a letra.
-- "text-highlight": Texto com marca-texto progressivo. Use para definições, afirmações e citações.
-- "checklist": Lista animada de 3 a 6 itens curtos. Use para passos, características ou benefícios.
-- "icon-carousel": Galeria de 3+ conceitos com emojis ou ícones. Use para comparações ou listas de entidades.
-- "documentary-layout": Imagem de fundo com texto informativo sobreposto. Use para personagens, lugares, eventos.
-- "image-fullscreen": Imagem em tela cheia com legenda. Use para momentos de impacto ou transições visuais.
-- "timeline": Linha do tempo animada com datas/marcos. Use quando há sequência cronológica.
+- "title": Abre o vídeo com o título animado letra a letra.
+- "text-highlight": Texto curto com marca-texto progressivo. Ideal para citações, afirmações e frases de impacto.
+- "checklist": Lista animada de 3–6 itens curtos. Ótimo para enumerar passos, características ou benefícios.
+- "icon-carousel": Grade de cards com emojis e rótulos. Funciona bem para conjuntos de conceitos distintos (3–6 itens).
+- "documentary-layout": Imagem nítida com fundo blur e caixa de texto sobreposta. Para contextualizar pessoas, lugares ou eventos.
+- "image-fullscreen": Imagem em tela cheia com legenda sutil. Para momentos de impacto visual ou respiro narrativo.
+- "timeline": Linha do tempo com marcos animados. Reservada para conteúdo que tem sequência cronológica clara.
 `;
 
-const SYSTEM_PROMPT = `Você é um diretor de vídeo especialista em transformar textos em roteiros visuais estruturados e cinematográficos.
+const SYSTEM_PROMPT = `Você é um diretor de vídeo experiente. Seu trabalho é transformar um texto narrado em um roteiro visual expressivo e adequado ao conteúdo.
 
 Dado um título e um texto de narração contínuo, você deve:
-1. Dividir o texto em cenas lógicas (cada cena = 1 ideia/parágrafo principal)
-2. Variar OBRIGATORIAMENTE os tipos de cena — nunca repita o mesmo tipo mais de 2 vezes consecutivas
-3. Usar TODOS os tipos disponíveis ao longo do vídeo sempre que possível
-4. Gerar um script.json válido e completo
+1. Dividir o texto em cenas lógicas (cada cena = 1 ideia ou parágrafo principal)
+2. Escolher para cada cena o tipo de componente que melhor serve àquele trecho — sem padrão fixo
+3. Gerar um script.json válido e completo
 
 ${SCENE_TYPES_REFERENCE}
 
-REGRAS OBRIGATÓRIAS:
+CRITÉRIOS DE ESCOLHA DO TIPO:
+- Deixe o conteúdo guiar a escolha. Um trecho de lista vira checklist, um momento emocional pode ser text-highlight, uma introdução de personagem pede documentary-layout, etc.
+- Não existe obrigação de usar todos os tipos, nem de evitar repetição. Use o que faz mais sentido.
+- Evite apenas seqüências longas do mesmo tipo sem necessidade (ex: 5 text-highlight seguidos sem motivo).
+
+REGRAS TÉCNICAS (estas são obrigatórias):
 - A primeira cena é SEMPRE do tipo "title" com durationInSeconds entre 3 e 5
-- TODA cena (sem exceção) deve ter um campo "imageQuery" com uma busca em inglês, específica e visual (3-6 palavras)
-  - Para "text-highlight": imagem de fundo temática que represente o assunto do texto
-  - Para "checklist": imagem de fundo que remeta ao tema da lista
-  - Para "icon-carousel": imagem de fundo relacionada ao tema do carrossel
-  - Para "title": imagem de fundo impactante relacionada ao tema do vídeo
-  - Para "timeline": imagem de fundo que represente a época ou o contexto
-  - Para "documentary-layout" e "image-fullscreen": imagem principal da cena
-- O "imageQuery" deve sempre estar dentro de "content"
-- O campo "narration.text" deve conter EXATAMENTE o trecho de narração daquela cena
+- TODA cena deve ter "imageQuery" dentro de "content": uma busca em inglês, visual e específica (3–6 palavras)
+- O campo "narration.text" deve conter o trecho exato da narração daquela cena
 - O campo "narration.file" deve ser "scene-XX.mp3" (XX = 01, 02...)
-- Para "text-highlight": inclua "text" (frase curta e impactante) dentro de "content"
-- Para "checklist": inclua "title" e "items" (array de strings curtas) dentro de "content"
-- Para "icon-carousel": inclua "cards" (array de {title, icon}) dentro de "content", use emojis no campo "icon"
-- Para "timeline": inclua "markers" (array de {value, label}) dentro de "content"
+- "text-highlight" requer: "content.text" (frase curta e impactante)
+- "checklist" requer: "content.title" e "content.items" (array de strings curtas)
+- "icon-carousel" requer: "content.cards" (array de {title, icon}) — use emojis no campo "icon"
+- "timeline" requer: "content.markers" (array de {value, label})
+- "documentary-layout" requer: "content.infoBoxes" (array de {title, text}) ou "content.title" e "content.subtitle"
 - Estime durationInSeconds: 150 palavras/min ≈ 2.5 palavras/segundo (mín: 4s, máx: 15s)
 
-ESTRUTURA OBRIGATÓRIA DE CADA CENA:
+ESTRUTURA DE CADA CENA:
 {
   "id": "scene-XX",
   "type": "<tipo>",
   "durationInSeconds": <número>,
-  "narration": { "file": "scene-XX.mp3", "text": "<texto da narração>" },
+  "narration": { "file": "scene-XX.mp3", "text": "<trecho narrado>" },
   "content": {
     "imageQuery": "<busca em inglês>",
     <outros campos do tipo>

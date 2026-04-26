@@ -105,17 +105,18 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
 
     case "documentary-layout": {
       const infoBox = (scene.content?.infoBoxes as Array<{ title?: string; text?: string }> | undefined)?.[0];
+      // Lê também title/subtitle direto do content (Claude pode gerar assim)
+      const docTitle = infoBox?.title || (scene.content?.title as string | undefined);
+      const docSubtitle = infoBox?.text || (scene.content?.subtitle as string | undefined);
       return (
+        // O DocumentaryLayout gerencia seu próprio fundo blur internamente
         <AbsoluteFill style={{ backgroundColor: "#000" }}>
-          <BackgroundImage overlayOpacity={0.35} imageOpacity={1} />
-          <div style={{ position: "relative", zIndex: 1, width: "100%", height: "100%" }}>
-            <DocumentaryLayout
-              theme={theme}
-              imageSrc={imageSrc}
-              title={infoBox?.title}
-              subtitle={infoBox?.text}
-            />
-          </div>
+          <DocumentaryLayout
+            theme={theme}
+            imageSrc={imageSrc}
+            title={docTitle}
+            subtitle={docSubtitle}
+          />
         </AbsoluteFill>
       );
     }
@@ -123,7 +124,7 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
     case "text-highlight":
       return (
         <AbsoluteFill style={{ backgroundColor: "#000", alignItems: "center", justifyContent: "center" }}>
-          {/* Darker overlay so the highlight text is very readable over the image */}
+          {/* BackgroundImage já aplica o overlay escuro — desabilitar o interno do ProgressiveHighlight */}
           <BackgroundImage overlayOpacity={0.65} imageOpacity={1} />
           <div style={{ position: "relative", zIndex: 1, width: "100%" }}>
             <ProgressiveHighlight
@@ -131,6 +132,7 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
               startFrame={10}
               endFrame={durationFrames - 10}
               theme={theme}
+              showDarkOverlay={false}
             />
           </div>
         </AbsoluteFill>
