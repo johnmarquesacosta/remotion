@@ -1,0 +1,61 @@
+{
+  "name": "remotion-tmp",
+  "version": "1.0.0",
+  "description": "My Remotion video",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@remotion/animated-emoji": "4.0.451",
+    "@remotion/animation-utils": "4.0.451",
+    "@remotion/cli": "4.0.451",
+    "@remotion/cloudrun": "4.0.451",
+    "@remotion/enable-scss": "4.0.451",
+    "@remotion/fonts": "4.0.451",
+    "@remotion/gif": "4.0.451",
+    "@remotion/google-fonts": "4.0.451",
+    "@remotion/install-whisper-cpp": "4.0.451",
+    "@remotion/media-utils": "^4.0.451",
+    "@remotion/motion-blur": "^4.0.451",
+    "@remotion/noise": "^4.0.451",
+    "@remotion/player": "^4.0.451",
+    "@remotion/rive": "^4.0.451",
+    "@remotion/shapes": "^4.0.451",
+    "@remotion/tailwind-v4": "4.0.451",
+    "@types/chroma-js": "^3.1.2",
+    "chroma-js": "^3.2.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.38.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-icons": "^5.6.0",
+    "remotion": "4.0.451",
+    "roughjs": "^4.6.6",
+    "tailwindcss": "^4.0.0",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.451",
+    "@types/node": "^25.6.0",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "tsx": "^4.21.0",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "calc-durations": "ts-node scripts/calculate-durations.ts",
+    "new-video": "tsx scripts/new-video.ts",
+    "narration": "tsx scripts/generate-narration.ts",
+    "fetch-assets": "tsx scripts/fetch-assets.ts"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
+}

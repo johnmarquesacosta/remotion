@@ -1,0 +1,59 @@
+{
+  "videoId": "video-001",
+  "channelId": "channel-default",
+  "format": "16:9",
+  "fps": 30,
+  "scenes": [
+    {
+      "id": "scene-01-title",
+      "type": "title",
+      "durationInSeconds": 4,
+      "narration": {
+        "file": "scene-01.wav",
+        "text": "Texto que será narrado nesta cena.",
+        "startAtSecond": 0.5
+      },
+      "camera": {
+        "zoom": {
+          "from": 1,
+          "to": 1.05,
+          "origin": "center"
+        },
+        "handheld": true
+      },
+      "vfx": {
+        "grayscale": false,
+        "vintageOverlay": false,
+        "gridVisible": true
+      },
+      "content": {
+        "title": "Título Principal",
+        "subtitle": "Subtítulo opcional"
+      }
+    },
+    {
+      "id": "scene-02-content",
+      "type": "checklist",
+      "durationInSeconds": 6,
+      "narration": {
+        "file": "scene-02.wav",
+        "text": "Listando os principais pontos...",
+        "startAtSecond": 0
+      },
+      "camera": {
+        "handheld": true
+      },
+      "vfx": {
+        "grayscale": false,
+        "gridVisible": true
+      },
+      "content": {
+        "items": [
+          { "label": "Primeiro ponto", "revealAtSecond": 1 },
+          { "label": "Segundo ponto",  "revealAtSecond": 2.5 },
+          { "label": "Terceiro ponto", "revealAtSecond": 4 }
+        ]
+      }
+    }
+  ]
+}

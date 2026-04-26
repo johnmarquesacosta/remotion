@@ -1,0 +1,9 @@
+node_modules
+dashboard/node_modules
+
+# Ignorar todas as pastas de vídeos, exceto o template
+videos/*
+!videos/_template/
+
+# Environment variables
+dashboard/.env
