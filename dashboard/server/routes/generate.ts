@@ -107,9 +107,10 @@ generateRouter.post("/", async (req, res) => {
     send("progress", { step: 3, total: 4, label: "Buscando imagens..." });
 
     const UNSPLASH_KEY = process.env.UNSPLASH_ACCESS_KEY;
+    const PEXELS_KEY = process.env.PEXELS_API_KEY;
     const scenesWithImages = script.scenes.filter((s) => s.content?.imageQuery);
 
-    if (UNSPLASH_KEY && scenesWithImages.length > 0) {
+    if ((UNSPLASH_KEY || PEXELS_KEY) && scenesWithImages.length > 0) {
       for (let i = 0; i < scenesWithImages.length; i++) {
         const scene = scenesWithImages[i];
         const query = scene.content.imageQuery as string;
@@ -122,18 +123,51 @@ generateRouter.post("/", async (req, res) => {
         });
 
         try {
-          const searchUrl = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=${format === "16:9" ? "landscape" : "portrait"}`;
-          const searchRes = await fetch(searchUrl, {
-            headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` },
-          });
-          
-          interface UnsplashResponse {
-            results: Array<{ urls: { regular: string } }>;
-          }
-          const searchData = (await searchRes.json()) as UnsplashResponse;
+          let imgUrl = "";
+          const orientation = format === "16:9" ? "landscape" : "portrait";
 
-          if (searchData.results?.length) {
-            const imgUrl = searchData.results[0].urls.regular;
+          // 1. Tenta Unsplash
+          if (UNSPLASH_KEY) {
+            try {
+              const searchUrl = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=${orientation}`;
+              const searchRes = await fetch(searchUrl, {
+                headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` },
+              });
+
+              interface UnsplashResponse {
+                results: Array<{ urls: { regular: string } }>;
+              }
+              const searchData = (await searchRes.json()) as UnsplashResponse;
+              if (searchData.results?.length) {
+                imgUrl = searchData.results[0].urls.regular;
+              }
+            } catch (e) {
+              console.error("[Unsplash] Erro ao buscar:", e);
+            }
+          }
+
+          // 2. Tenta Pexels como fallback se Unsplash falhou ou não está configurado
+          if (!imgUrl && PEXELS_KEY) {
+            try {
+              const searchUrl = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=${orientation}`;
+              const searchRes = await fetch(searchUrl, {
+                headers: { Authorization: PEXELS_KEY },
+              });
+              
+              interface PexelsResponse {
+                photos: Array<{ src: { large2x: string; original: string } }>;
+              }
+              const searchData = (await searchRes.json()) as PexelsResponse;
+              if (searchData.photos?.length) {
+                // Pexels retorna tamanhos variados. 'large2x' ou 'original' são bons para vídeos
+                imgUrl = searchData.photos[0].src.large2x || searchData.photos[0].src.original;
+              }
+            } catch (e) {
+              console.error("[Pexels] Erro ao buscar:", e);
+            }
+          }
+
+          if (imgUrl) {
             const imgRes = await fetch(imgUrl);
             const buffer = await imgRes.arrayBuffer();
             const imgPath = path.join(videoDir, "assets", "images", filename);
@@ -144,15 +178,17 @@ generateRouter.post("/", async (req, res) => {
             if (sceneIndex !== -1) {
               script.scenes[sceneIndex].content.imageFile = filename;
             }
+          } else {
+            send("warning", { message: `Sem resultados no Unsplash/Pexels para: "${query}"` });
           }
         } catch {
-          send("warning", { message: `Não foi possível buscar imagem para "${query}"` });
+          send("warning", { message: `Falha na requisição de imagem para "${query}"` });
         }
       }
 
       fs.writeFileSync(scriptPath, JSON.stringify(script, null, 2));
-    } else if (!UNSPLASH_KEY) {
-      send("warning", { message: "UNSPLASH_ACCESS_KEY não configurada — imagens puladas" });
+    } else if (!UNSPLASH_KEY && !PEXELS_KEY) {
+      send("warning", { message: "Nenhuma API de imagem configurada (.env) — imagens puladas" });
     }
 
     send("progress", { step: 3, total: 4, label: "Assets prontos", done: true });

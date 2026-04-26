@@ -22,7 +22,8 @@ export const AssetManager: React.FC<Props> = ({ videoId }) => {
     try {
       const list = await listVideoImages(videoId);
       setImages(list);
-    } catch {
+    } catch (error) {
+      console.error("Erro ao listar imagens:", error);
     } finally {
       setLoading(false);
     }
@@ -87,7 +88,7 @@ export const AssetManager: React.FC<Props> = ({ videoId }) => {
             onClick={handleFetchImages}
             disabled={fetching}
           >
-            {fetching ? "⏳ Buscando..." : "🔍 Buscar Imagens (Unsplash)"}
+            {fetching ? "⏳ Buscando..." : "🔍 Buscar Imagens (Unsplash/Pexels)"}
           </button>
           {images.length > 0 && (
             <button className="download-all-btn" onClick={handleDownloadAll}>
@@ -118,7 +119,7 @@ export const AssetManager: React.FC<Props> = ({ videoId }) => {
           <span className="empty-icon">🖼️</span>
           <p>Nenhuma imagem encontrada</p>
           <p className="hint">
-            Use o botão acima para buscar imagens do Unsplash
+            Use o botão acima para buscar imagens do Unsplash/Pexels.
           </p>
         </div>
       ) : (
@@ -126,6 +127,7 @@ export const AssetManager: React.FC<Props> = ({ videoId }) => {
           {images.map((img) => (
             <div key={img.filename} className="image-card">
               <div className="image-preview">
+                {/* eslint-disable-next-line remotion/warn-native-media-tag, @remotion/warn-native-media-tag */}
                 <img
                   src={img.url}
                   alt={img.filename}

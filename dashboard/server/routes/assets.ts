@@ -66,9 +66,9 @@ assetsRouter.post("/:videoId/fetch-images", async (req, res) => {
   try {
     const script = JSON.parse(fs.readFileSync(scriptPath, "utf-8")) as VideoScript;
     const UNSPLASH_KEY = process.env.UNSPLASH_ACCESS_KEY;
-
-    if (!UNSPLASH_KEY) {
-      send("error", { message: "UNSPLASH_ACCESS_KEY não configurada no .env" });
+    const PEXELS_KEY = process.env.PEXELS_API_KEY;
+    if (!UNSPLASH_KEY && !PEXELS_KEY) {
+      send("error", { message: "Nenhuma API de imagem configurada (.env) (Unsplash ou Pexels)" });
       res.end();
       return;
     }
@@ -122,22 +122,58 @@ assetsRouter.post("/:videoId/fetch-images", async (req, res) => {
       });
 
       try {
+        let imgUrl = "";
         const orientation = format === "16:9" ? "landscape" : "portrait";
-        const searchUrl = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
-          scene.query as string
-        )}&per_page=1&orientation=${orientation}`;
 
-        const searchRes = await fetch(searchUrl, {
-          headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` },
-        });
-        
-        interface UnsplashResponse {
-          results: Array<{ urls: { regular: string } }>;
+        // 1. Tenta Unsplash
+        if (UNSPLASH_KEY) {
+          try {
+            const searchUrl = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
+              scene.query as string
+            )}&per_page=1&orientation=${orientation}`;
+
+            const searchRes = await fetch(searchUrl, {
+              headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` },
+            });
+            
+            interface UnsplashResponse {
+              results: Array<{ urls: { regular: string } }>;
+            }
+            const searchData = (await searchRes.json()) as UnsplashResponse;
+
+            if (searchData.results?.length) {
+              imgUrl = searchData.results[0].urls.regular;
+            }
+          } catch (e) {
+            console.error("[Unsplash] Erro na busca manual:", e);
+          }
         }
-        const searchData = (await searchRes.json()) as UnsplashResponse;
 
-        if (searchData.results?.length) {
-          const imgUrl = searchData.results[0].urls.regular;
+        // 2. Tenta Pexels se Unsplash falhou ou não existe
+        if (!imgUrl && PEXELS_KEY) {
+          try {
+            const searchUrl = `https://api.pexels.com/v1/search?query=${encodeURIComponent(
+              scene.query as string
+            )}&per_page=1&orientation=${orientation}`;
+
+            const searchRes = await fetch(searchUrl, {
+              headers: { Authorization: PEXELS_KEY },
+            });
+            
+            interface PexelsResponse {
+              photos: Array<{ src: { large2x: string; original: string } }>;
+            }
+            const searchData = (await searchRes.json()) as PexelsResponse;
+
+            if (searchData.photos?.length) {
+              imgUrl = searchData.photos[0].src.large2x || searchData.photos[0].src.original;
+            }
+          } catch (e) {
+            console.error("[Pexels] Erro na busca manual:", e);
+          }
+        }
+
+        if (imgUrl) {
           const imgRes = await fetch(imgUrl);
           const buffer = await imgRes.arrayBuffer();
           fs.writeFileSync(imgPath, Buffer.from(buffer));
@@ -158,6 +194,11 @@ assetsRouter.post("/:videoId/fetch-images", async (req, res) => {
             total: scenesWithQuery.length,
           });
         } else {
+          send("progress", {
+            label: `❌ Sem resultados para "${scene.query}"`,
+            current: i + 1,
+            total: scenesWithQuery.length,
+          });
           send("warning", { message: `Nenhum resultado para "${scene.query}"` });
         }
       } catch (e: unknown) {

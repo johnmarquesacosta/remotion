@@ -16,10 +16,15 @@ export const DocumentaryLayout: React.FC<DocumentaryLayoutProps> = ({
   subtitle,
 }) => {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
+  const { width, height, durationInFrames } = useVideoConfig();
 
   const fadeIn = interpolate(frame, [0, 20], [0, 1], { extrapolateRight: "clamp" });
   const slideUp = interpolate(frame, [10, 35], [40, 0], { extrapolateRight: "clamp" });
+  
+  // Efeito de zoom na imagem nítida central (Ken Burns invertido/scale)
+  const imageScale = interpolate(frame, [0, durationInFrames], [0.72, 0.8], {
+    extrapolateRight: "clamp",
+  });
 
   return (
     <AbsoluteFill style={{ opacity: fadeIn }}>
@@ -38,20 +43,21 @@ export const DocumentaryLayout: React.FC<DocumentaryLayoutProps> = ({
               transformOrigin: "center center",
             }}
           />
-          {/* Imagem nítida menor, centralizada e elevada */}
+          {/* Imagem nítida animada (zoom progressivo até 0.8) */}
           <Img
             src={imageSrc}
             style={{
               position: "absolute",
-              width: Math.min(width * 0.55, 860),
-              height: Math.min(height * 0.55, 540),
+              width: width,
+              height: height,
               objectFit: "cover",
-              borderRadius: 16,
-              top: "50%",
-              left: "50%",
-              transform: `translate(-50%, -65%)`,
-              boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
-              border: `3px solid ${theme.colors.accent}55`,
+              borderRadius: 24,
+              top: 0,
+              left: 0,
+              transform: `scale(${imageScale}) translateY(-8%)`,
+              transformOrigin: "center center",
+              boxShadow: "0 24px 80px rgba(0,0,0,0.8)",
+              border: `4px solid ${theme.colors.accent}66`,
             }}
           />
         </>
